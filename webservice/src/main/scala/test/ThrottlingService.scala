@@ -71,20 +71,26 @@ class ThrottlingServiceImpl(val slaService: SlaService,
         }
     }, 100, 100)
 
-    def isRequestAllowed(tokenOpt: Option[String]): Boolean = tokenOpt.map { token =>
+    def isRequestAllowed(tokenOpt: Option[String]): Boolean = isRequestAllowedImpl(tokenOpt, slaCache, rpsCounters, graceActualRps, slaRequestFunc)
+
+    def isRequestAllowedImpl(tokenOpt: Option[String],
+                             slaCache: ConcurrentHashMap[String, Sla],
+                             rpsCounters: ConcurrentHashMap[String, Integer],
+                             graceActualRps: AtomicLong,
+                             slaRequestFunc: java.util.function.Function[String, Sla]) = tokenOpt.map { token =>
         Option(slaCache.get(token)) match {
-            case Some(sla) => handleUser(sla)
+            case Some(sla) => handleUser(sla, rpsCounters)
             case None => {
                 Future {
                     slaCache.computeIfAbsent(token, slaRequestFunc)
                 } (slaRequestsEC)
                 // first request for a token will be processed without waiting for SLA service
-                handleGrace // it's possible to perform rate limiting by ip at this point
+                handleGrace(graceActualRps) // it's possible to perform rate limiting by ip at this point
             }
         }
-    }.getOrElse(handleGrace)
+    }.getOrElse(handleGrace(graceActualRps))
 
-    def handleUser(sla: Sla): Boolean = {
+    def handleUser(sla: Sla, rpsCounters: ConcurrentHashMap[String, Integer]): Boolean = {
         val actualRPS = rpsCounters.getOrDefault(sla.user, 0)
         if(actualRPS * config.numTimeslotsPerSecond < sla.rps) {
             rpsCounters.compute(sla.user, new BiFunction[String, Integer, Integer] {
@@ -94,7 +100,7 @@ class ThrottlingServiceImpl(val slaService: SlaService,
         } else false
     }
 
-    def handleGrace: Boolean = {
+    def handleGrace(graceActualRps: AtomicLong): Boolean = {
         if(graceActualRps.get() * config.numTimeslotsPerSecond < config.graceRps) {
             graceActualRps.incrementAndGet()
             true
