@@ -27,8 +27,8 @@ object WebServer extends App {
     }.toMap
     val rpsPerUser = (0 until 10).map { i =>
         val userName = s"user$i"
-        userName -> Sla(userName, 1000)
-    }.toMap
+        Sla(userName, 1000)
+    }
     // End of configuration
 
     val slaService: SlaService = new SlaServiceImpl(tokensMap, rpsPerUser)

@@ -19,7 +19,9 @@ trait SlaService {
 }
 
 // Basically test stub
-class SlaServiceImpl(tokens2Users: Map[String, String], rpsPerUser: Map[String, Sla]) extends SlaService {
+class SlaServiceImpl(tokens2Users: Map[String, String], sla: Seq[Sla]) extends SlaService {
+
+    val rpsPerUser: Map[String, Sla] = sla.map(s => s.user -> s).toMap
 
     // validate that set of users in tokens2Users and rpsPerUser are the same
     val diff = tokens2Users.values.toSet.diff(rpsPerUser.keySet)
