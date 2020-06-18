@@ -3,7 +3,7 @@ import java.util.TimerTask
 import scalaj.http._
 
 object Run extends App {
-    val numThreads = 4
+    val numThreads = 8
     val testDuration = 60
     val numTokens = 10
 

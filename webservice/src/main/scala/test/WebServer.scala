@@ -15,6 +15,7 @@ import collection.JavaConverters._
 
 object WebServer extends App {
 
+    // Configuration
     val config = Configuration(
         slaServiceTimeoutInSeconds = 1,
         maxConcurrentSlaRequests = 10,
@@ -22,10 +23,15 @@ object WebServer extends App {
         graceRps = 1000)
 
     val tokensMap = (0 until 10).map { i =>
-        s"token$i" -> Sla(s"user$i", 100 + 50 * i)
+        s"token$i" -> s"user$i"
     }.toMap
+    val rpsPerUser = (0 until 10).map { i =>
+        val userName = s"user$i"
+        userName -> Sla(userName, 1000)
+    }.toMap
+    // End of configuration
 
-    val slaService: SlaService = new SlaServiceImpl(tokensMap)
+    val slaService: SlaService = new SlaServiceImpl(tokensMap, rpsPerUser)
     val throttlingService: ThrottlingService = new ThrottlingServiceImpl(slaService, config)
 
     // for monitoring purposes
@@ -54,7 +60,8 @@ object WebServer extends App {
             get {
                 optionalHeaderValueByName("token") { tokenOpt =>
                     complete({
-                        if (throttlingService.isRequestAllowed(tokenOpt)) {
+                        if (throttlingService.isRequestAllowed(tokenOpt))
+                        {
                             perTokenRPS.compute(tokenOpt.getOrElse("Unauthorized"), new BiFunction[String, Integer, Integer] {
                                 override def apply(t: String, u: Integer): Integer = {
                                     if (u == null) 1

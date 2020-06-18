@@ -19,10 +19,17 @@ trait SlaService {
 }
 
 // Basically test stub
-class SlaServiceImpl(map: Map[String, Sla]) extends SlaService {
+class SlaServiceImpl(tokens2Users: Map[String, String], rpsPerUser: Map[String, Sla]) extends SlaService {
+
+    // validate that set of users in tokens2Users and rpsPerUser are the same
+    val diff = tokens2Users.values.toSet.diff(rpsPerUser.keySet)
+    if(diff.nonEmpty) {
+        throw new RuntimeException(s"Configuration error in SlaService, either a token or rps is missing for users in $diff")
+    }
 
     def getSlaByToken(token:String): Future[Sla] = {
-        map.get(token)
+        tokens2Users.get(token)
+            .map(rpsPerUser)
             .map(x => Future.successful(x))
             .getOrElse(Future.failed(new Throwable(s"Unknown token $token")))
     }
